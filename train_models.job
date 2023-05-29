@@ -4,30 +4,33 @@
 #SBATCH --gres=gpu:1
 #SBATCH --job-name=TrainModels
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=6
+#SBATCH --cpus-per-task=3
 #SBATCH --time=12:00:00
-#SBATCH --mem=64000M
+#SBATCH --mem=32000M
 #SBATCH --output=slurm_output_%A.out
 
 module purge
 module load 2022
-module load Anaconda3/2022.05
+# module load Anaconda3/2022.05
 
-cd $HOME/sentence_embeddings_learning
+PROJECT_PATH="$HOME/RL-Machine-Translation"
+
+cd $PROJECT_PATH
 source activate rl_nmt
 
-PROJECT_PATH="$HOME/RL-Machine-Translation" # change this
 LEARNING_RATE=(5e-4) # 1e-4 3e-3)
-CRITERION_LOSS=("comet" "bleurt")
+# CRITERION_LOSS=("comet")
+CRITERION_LOSS=("bleurt")
 BATCH_SIZE=(16) # 32 64)
 DECODER_MAX_ITER=9
+MAX_EPOCHS=133
 
 cd "$PROJECT_PATH/fairseq_extend"
 
 for criterion in ${CRITERION_LOSS[@]}; do
     for lr in ${LEARNING_RATE[@]}; do
         for batch_size in ${BATCH_SIZE[@]}; do
-            srun python train.py \
+            srun python -u train.py \
                     --config-dir "fairseq_easy_extend/models/nat/" \
                     --config-name "cmlm_config.yaml" \
                     task.data="$PROJECT_PATH/iwslt14.tokenized.de-en" \
@@ -36,7 +39,8 @@ for criterion in ${CRITERION_LOSS[@]}; do
                     criterion._name=$criterion \
                     checkpoint.restore_file="$PROJECT_PATH/checkpoint_best.pt" \
                     checkpoint.reset_optimizer=True \
-                    checkpoint.save_dir="$PROJECT_PATH/checkpoints/${criterion}_${lr}_${batch_size}"
+                    checkpoint.save_dir="$PROJECT_PATH/checkpoints/${criterion}_${lr}_${batch_size}" \
+                    optimization.max_epoch=$MAX_EPOCHS
         done
     done
 done
